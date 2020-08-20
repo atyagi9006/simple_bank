@@ -10,6 +10,7 @@ stop_postgres:
 .PHONY: postgres
 postgres: stop_postgres
 	docker run --name dev-postgres -p 5432:5432 -e POSTGRES_USER=root  -e POSTGRES_PASSWORD=P@ssw0rd -d postgres:12-alpine
+	@sleep 10
 
 .PHONY: createdb
 createdb:
@@ -31,3 +32,19 @@ migratedown:
 sqlc:
 	@echo "generating code"
 	sqlc generate
+
+.PHONY: startdb
+startdb: postgres createdb migrateup
+
+.PHONY: test
+test:
+	go test -v -cover ./...
+
+.PHONY: my_test
+my_test:
+	@echo "mode: set" > coverage-all.out
+
+	@go test -v -timeout 600s -tags unit -coverprofile=coverage.out -race ./... | \
+		tee -a test-results.out || exit 1;\
+		tail -n +2 coverage.out >> coverage-all.out || exit 1
+	@go tool cover -html=coverage-all.out -o test-coverage.html

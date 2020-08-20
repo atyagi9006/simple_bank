@@ -69,7 +69,6 @@ ORDER BY id
 LIMIT $1
 OFFSET $2
 `
-
 type ListAccountsParams struct {
 	Limit  int32 `json:"limit"`
 	Offset int32 `json:"offset"`
@@ -104,10 +103,11 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]A
 	return items, nil
 }
 
-const updateBalanceInAccount = `-- name: UpdateBalanceInAccount :exec
+const updateBalanceInAccount = `-- name: UpdateBalanceInAccount :one
 UPDATE accounts 
 SET balance = $2
 WHERE id = $1
+RETURNING id, owner, balance, currency, created_at
 `
 
 type UpdateBalanceInAccountParams struct {
@@ -115,7 +115,15 @@ type UpdateBalanceInAccountParams struct {
 	Balance int64 `json:"balance"`
 }
 
-func (q *Queries) UpdateBalanceInAccount(ctx context.Context, arg UpdateBalanceInAccountParams) error {
-	_, err := q.db.ExecContext(ctx, updateBalanceInAccount, arg.ID, arg.Balance)
-	return err
+func (q *Queries) UpdateBalanceInAccount(ctx context.Context, arg UpdateBalanceInAccountParams) (Account, error) {
+	row := q.db.QueryRowContext(ctx, updateBalanceInAccount, arg.ID, arg.Balance)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Owner,
+		&i.Balance,
+		&i.Currency,
+		&i.CreatedAt,
+	)
+	return i, err
 }
